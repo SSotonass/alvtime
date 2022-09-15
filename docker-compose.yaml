@@ -36,6 +36,8 @@ services:
       context: ./packages/api
     depends_on:
       - db
+      - db-migrator
+      - db-populator
     environment:
       - ConnectionStrings__AlvTime_db=Data Source=tcp:db,1433;Initial Catalog=AlvDevDB;User ID=sa;Password=AlvTimeTestErMoro32
       - AzureAd__Domain=api://c9126a83-01c3-43c0-8bb3-298d352d2d7f
@@ -49,20 +51,36 @@ services:
       - "80"
 
   db:
-    build:
-      context: ./packages/api/AlvTime.Persistence/Database
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=AlvTimeTestErMoro32
+      - MSSQL_PID=Developer
     ports:
       - "1434:1433"
     expose:
       - "1433"
-    command:
-      - /bin/bash
-      - -c
-      - |
-        # Launch MSSQL and send to background
-        /opt/mssql/bin/sqlservr &
-        # So that the container doesn't shut down, sleep this thread
-        sleep infinity
+    healthcheck:
+      test: /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P "$${SA_PASSWORD}" -Q "SELECT 1" -b -o /dev/null
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+  db-migrator:
+    build: packages/db/Alvtime.Database.Migrations
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - DB_CONNECTION=Data Source=db;Initial Catalog=AlvDevDB;User Id=sa;Password=AlvTimeTestErMoro32;
+
+  db-populator:
+    build: packages/db/Alvtime.Database.Populations
+    depends_on:
+      - db-migrator
+    environment:
+      - DB_CONNECTION=Data Source=db;Initial Catalog=AlvDevDB;User Id=sa;Password=AlvTimeTestErMoro32;
 
   slack-app:
     tty: true
