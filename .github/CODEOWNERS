@@ -4,5 +4,6 @@
 /packages/slack-app/ @trulsaa
 /packages/charts/ @trulsaa @klyngen
 /packages/shell/ @trulsaa
+/packages/db/ @palbock90 @lnordhus
 .AzureDevOps/ @trulsaa @lnordhus
 .github/ @theknarf @trulsaa
