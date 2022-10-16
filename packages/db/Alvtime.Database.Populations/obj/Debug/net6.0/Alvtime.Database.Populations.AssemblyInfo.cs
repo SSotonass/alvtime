@@ -10,6 +10,7 @@
 using System;
 using System.Reflection;
 
+[assembly: Microsoft.Extensions.Configuration.UserSecrets.UserSecretsIdAttribute("0bf29e7e-923e-4eb9-9fef-4667f5088f97")]
 [assembly: System.Reflection.AssemblyCompanyAttribute("Alvtime.Database.Populations")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]

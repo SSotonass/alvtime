@@ -34,7 +34,7 @@ This can be done in several different ways. Select the method that suits you and
 Dependencies:
 
 - [Node.js 14](https://nodejs.org/en/)
-- [.NET Core 3.1](https://dotnet.microsoft.com/download/dotnet/3.1)
+- [.NET 5](https://dotnet.microsoft.com/en-us/download/dotnet/5.0)
 - [MsSQL](https://www.microsoft.com/en-us/sql-server/sql-server-downloads)
 - [MongoDB](https://www.mongodb.com/try/download/enterprise)
 
@@ -47,6 +47,8 @@ Dependencies:
 - [Docker](https://www.docker.com/products/docker-desktop)
 
 A docker compose development environment has been defined for this project in `docker-compose.yaml`. This enables the whole or part of the local environment to be started using docker. Several helper commands have been added to the `run` script file. Have a quick look through the `run` file to find some of the possibilities. In order to start the frontend development server, backend api and database, just run `./run frontend` from the project root. The first time this is done, docker downloads all the necessary images and compiles the necessary code. This might take some time. The next time you start the development environment is much faster. To shut down the development environment, run `./run down`.
+
+If you have trouble running commands from the `run` file you can optionally use `docker-compose up --build <service-name>`.
 
 Whenever a dependency is added to the frontend or the backend code is changed you have to rebuild the container to see the changes. This is done by shutting down the environment `./run down` and running `docker-compose build <service name>`. For example running `docker-compose build frontend` will download all the dependencies inside the container and make them available to the development server. Make sure to run `docker-compose build api` to rebuild the api backend service and include changes.
 

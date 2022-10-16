@@ -6,6 +6,7 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <RootNamespace>Alvtime.Database.Populations</RootNamespace>
+        <UserSecretsId>0bf29e7e-923e-4eb9-9fef-4667f5088f97</UserSecretsId>
     </PropertyGroup>
 
     <ItemGroup>

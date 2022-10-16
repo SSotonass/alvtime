@@ -78,7 +78,8 @@ services:
   db-populator:
     build: packages/db/Alvtime.Database.Populations
     depends_on:
-      - db-migrator
+      db-migrator:
+        condition: service_completed_successfully
     environment:
       - DB_CONNECTION=Data Source=db;Initial Catalog=AlvDevDB;User Id=sa;Password=AlvTimeTestErMoro32;
 

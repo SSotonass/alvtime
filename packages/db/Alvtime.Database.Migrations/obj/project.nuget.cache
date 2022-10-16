@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "82VSQmGfff1+C/TMz+Pqw1SrNPwoUC9hGWIAmbtY6ed/kmSm75bSktME9Sd1qEUiMKF8pGNms/6Flo12y+jedg==",
+  "dgSpecHash": "saeZSQoxV8a+OHeUQ5dwC+O6DX3dY1iWNvNwMqOY3bikRNaJWUYyRTxhCtqYC0P4j0rgOgR/RiJ6a2VnqxIKcw==",
   "success": true,
   "projectFilePath": "C:\\_dev\\alvtime\\packages\\db\\Alvtime.Database.Migrations\\Alvtime.Database.Migrations.csproj",
   "expectedPackageFiles": [

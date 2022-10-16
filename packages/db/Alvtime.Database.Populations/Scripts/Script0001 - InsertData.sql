@@ -1,6 +1,3 @@
-USE AlvDevDB
-GO
-
 insert into [dbo].[Customer]
 values 
 ('SuperMat', 'Alvvegen 34', 'Supermann', 'supermann@supermat.no', '81549300'),                                                                                        
