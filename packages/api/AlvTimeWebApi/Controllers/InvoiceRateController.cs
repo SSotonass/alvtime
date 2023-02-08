@@ -1,8 +1,11 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using AlvTime.Business.InvoiceRate;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.AspNetCore.Mvc;
+using static AlvTime.Business.InvoiceRate.InvoiceStatisticsDto;
 
 namespace AlvTimeWebApi.Controllers;
 
@@ -38,8 +41,8 @@ public class InvoiceRateController : ControllerBase
 
     [HttpGet("InvoiceStatistics")]
     [Authorize(Policy = "AllowPersonalAccessToken")]
-    public async Task<InvoiceStatisticsDto> FetchUserInvoiceStatistics(DateTime fromDate, DateTime toDate)
+    public async Task<IEnumerable<InvoiceStatisticsDto>> FetchUserInvoiceStatistics(DateTime fromDate, DateTime toDate, InvoicePeriods period, ExtendPeriod extendPeriod)
     {
-        return await _invoiceRateService.GetEmployeeInvoiceStatisticsByMonth(fromDate.Date, toDate.Date);
+        return await _invoiceRateService.GetEmployeeInvoiceStatisticsByPeriod(fromDate.Date, toDate.Date, period, extendPeriod);
     }
 }
