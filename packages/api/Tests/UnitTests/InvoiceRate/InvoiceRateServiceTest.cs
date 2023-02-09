@@ -1,5 +1,4 @@
 using System;
-using System.Threading.Tasks;
 using Xunit;
 using AlvTime.Business.Options;
 using Moq;
@@ -11,6 +10,9 @@ using AlvTime.Business.TimeEntries;
 using AlvTime.Business.TimeRegistration;
 using AlvTime.Business.Interfaces;
 using System.Linq;
+using static AlvTime.Business.InvoiceRate.InvoiceStatisticsDto;
+using AlvTime.Persistence.Repositories;
+using AlvTime.Persistence.DatabaseModels;
 
 namespace Tests.UnitTests.InvoiceRate;
 
@@ -26,7 +28,7 @@ public class InvoiceRateServiceTest
     {
         var entryOptions = new TimeEntryOptions
         {
-            PaidHolidayTask = 13,
+            PaidHolidayTask = 10,
         };
 
         _options = Mock.Of<IOptionsMonitor<TimeEntryOptions>>(options => options.CurrentValue == entryOptions);
@@ -41,30 +43,39 @@ public class InvoiceRateServiceTest
             Email = "someone@alv.no",
             Name = "Someone"
         };
-
-
-        _userContextMock.Setup(context => context.GetCurrentUser()).Returns(Task.FromResult(user));
+        _userContextMock.Setup(context => context.GetCurrentUser()).Returns(System.Threading.Tasks.Task.FromResult(user));
     }
 
     [Fact]
-    public async Task GetInvoicePercentage_Without_Vacation()
+    public async System.Threading.Tasks.Task GetInvoicePercentage_Without_Vacation()
     {
-        var mockRepository = CreateMockRepository(new List<TimeEntryWithCustomerDto>{
-                    new TimeEntryWithCustomerDto {
-                        TaskId = 1,
-                        CustomerName = "alv",
-                        Value = 1.5m,
-                        Date = new DateTime(2022, 01, 01)
-                    },
-                    new TimeEntryWithCustomerDto {
-                        TaskId = 2,
-                        CustomerName = "evil inc",
-                        Value = 6,
-                        Date = new DateTime(2022, 01, 01)
-                    }
-                });
+        var hours = new List<Hours>
+        {
+            new Hours
+            {
+                User = 1,
+                Date = new DateTime(2022, 01, 03),
+                DayNumber = (short)new DateTime(2022, 01, 03).DayOfYear,
+                Id = 1,
+                Locked = false,
+                TaskId = 3,
+                Value = 1.5m,
+                Year = (short)new DateTime(2022, 01, 03).Year
+            },
+            new Hours
+            {
+                User = 1,
+                Date = new DateTime(2022, 01, 03),
+                DayNumber = (short)new DateTime(2022, 01, 03).DayOfYear,
+                Id = 2,
+                Locked = false,
+                TaskId = 1,
+                Value = 6m,
+                Year = (short)new DateTime(2022, 01, 03).Year
+            }
+        };
 
-        var service = new InvoiceRateService(mockRepository.Object, _redDaysService, _options, _userContextMock.Object);
+        var service = CreateInvoiceRateService(hours);
 
         decimal invoiceRate = await service.GetEmployeeInvoiceRateForPeriod(new DateTime(2022, 01, 03), new DateTime(2022, 01, 03));
 
@@ -72,44 +83,69 @@ public class InvoiceRateServiceTest
     }
 
     [Fact]
-    public async Task GetInvoicePercentage_DuringEaster_WithVacation()
+    public async System.Threading.Tasks.Task GetInvoicePercentage_DuringEaster_WithVacation()
     {
         // One vacation-day on wednesday in easter and works half days monday and tuesday with billable
-        var mockRepository = CreateMockRepository(new List<TimeEntryWithCustomerDto>{
-                    new TimeEntryWithCustomerDto {
-                        TaskId = 1,
-                        CustomerName = "alv",
-                        Value = 3m,
-                        Date = new DateTime(2022, 04, 11)
-                    },
-                    new TimeEntryWithCustomerDto {
-                        TaskId = 1,
-                        CustomerName = "alv",
-                        Value = 3m,
-                        Date = new DateTime(2022, 04, 12)
-                    },
-                    new TimeEntryWithCustomerDto {
-                        TaskId = 2,
-                        CustomerName = "evil inc",
-                        Value = 4.5m,
-                        Date = new DateTime(2022, 04, 11)
-                    },
-                    new TimeEntryWithCustomerDto
-                    {
-                        TaskId = 2,
-                        CustomerName = "evil inc",
-                        Value = 4.5m,
-                        Date = new DateTime(2022, 04, 12)
-                    },
-                    new TimeEntryWithCustomerDto {
-                        TaskId = 13,
-                        CustomerName = "alv",
-                        Value = 7.5m,
-                        Date = new DateTime(2022, 04, 13)
-                    },
-                });
+        var hours = new List<Hours>
+        {
+            new Hours
+            {
+                User = 1,
+                Date = new DateTime(2022, 04, 11),
+                DayNumber = (short)new DateTime(2022, 04, 11).DayOfYear,
+                Id = 1,
+                Locked = false,
+                TaskId = 3,
+                Value = 3m,
+                Year = (short)new DateTime(2022, 04, 11).Year
+            },
+            new Hours
+            {
+                User = 1,
+                Date = new DateTime(2022, 04, 11),
+                DayNumber = (short)new DateTime(2022, 04, 11).DayOfYear,
+                Id = 2,
+                Locked = false,
+                TaskId = 1,
+                Value = 4.5m,
+                Year = (short)new DateTime(2022, 04, 11).Year
+            },
+            new Hours
+            {
+                User = 1,
+                Date = new DateTime(2022, 04, 12),
+                DayNumber = (short)new DateTime(2022, 04, 12).DayOfYear,
+                Id = 3,
+                Locked = false,
+                TaskId = 3,
+                Value = 3m,
+                Year = (short)new DateTime(2022, 04, 12).Year
+            },
+            new Hours
+            {
+                User = 1,
+                Date = new DateTime(2022, 04, 12),
+                DayNumber = (short)new DateTime(2022, 04, 12).DayOfYear,
+                Id = 4,
+                Locked = false,
+                TaskId = 1,
+                Value = 4.5m,
+                Year = (short)new DateTime(2022, 04, 12).Year
+            },
+            new Hours
+            {
+                User = 1,
+                Date = new DateTime(2022, 04, 13),
+                DayNumber = (short)new DateTime(2022, 04, 13).DayOfYear,
+                Id = 5,
+                Locked = false,
+                TaskId = 10,
+                Value = 7.5m,
+                Year = (short)new DateTime(2022, 04, 13).Year
+            }
+        };
 
-        var service = new InvoiceRateService(mockRepository.Object, _redDaysService, _options, _userContextMock.Object);
+        var service = CreateInvoiceRateService(hours);
 
         decimal invoiceRate = await service.GetEmployeeInvoiceRateForPeriod(new DateTime(2022, 4, 11), new DateTime(2022, 4, 17));
 
@@ -117,43 +153,68 @@ public class InvoiceRateServiceTest
     }
 
     [Fact]
-    public async Task GetInvoicePercentage_With_Weekend()
+    public async System.Threading.Tasks.Task GetInvoicePercentage_With_Weekend()
     {
-        // One vacation-day on wednesday in easter and works half days monday and tuesday with billable
-        var mockRepository = CreateMockRepository(new List<TimeEntryWithCustomerDto>{
-                    new TimeEntryWithCustomerDto {
-                        TaskId = 2,
-                        CustomerName = "evil inc",
-                        Value = 7.5m,
-                        Date = new DateTime(2022, 12, 12)
-                    },
-                    new TimeEntryWithCustomerDto {
-                        TaskId = 2,
-                        CustomerName = "evil inc",
-                        Value = 7.5m,
-                        Date = new DateTime(2022, 12, 13)
-                    },
-                    new TimeEntryWithCustomerDto {
-                        TaskId = 2,
-                        CustomerName = "evil inc",
-                        Value = 7.5m,
-                        Date = new DateTime(2022, 12, 14)
-                    },
-                    new TimeEntryWithCustomerDto {
-                        TaskId = 2,
-                        CustomerName = "evil inc",
-                        Value = 7.5m,
-                        Date = new DateTime(2022, 12, 15)
-                    },
-                    new TimeEntryWithCustomerDto {
-                        TaskId = 2,
-                        CustomerName = "evil inc",
-                        Value = 7.5m,
-                        Date = new DateTime(2022, 12, 16)
-                    },
-                });
+        var hours = new List<Hours>
+        {
+            new Hours
+            {
+                User = 1,
+                Date = new DateTime(2022, 12, 12),
+                DayNumber = (short)new DateTime(2022, 12, 12).DayOfYear,
+                Id = 1,
+                Locked = false,
+                TaskId = 1,
+                Value = 7.5m,
+                Year = (short)new DateTime(2022, 12, 12).Year
+            },
+            new Hours
+            {
+                User = 1,
+                Date = new DateTime(2022, 12, 13),
+                DayNumber = (short)new DateTime(2022, 12, 13).DayOfYear,
+                Id = 2,
+                Locked = false,
+                TaskId = 1,
+                Value = 7.5m,
+                Year = (short)new DateTime(2022, 12, 13).Year
+            },
+            new Hours
+            {
+                User = 1,
+                Date = new DateTime(2022, 12, 14),
+                DayNumber = (short)new DateTime(2022, 12, 14).DayOfYear,
+                Id = 3,
+                Locked = false,
+                TaskId = 1,
+                Value = 7.5m,
+                Year = (short)new DateTime(2022, 12, 14).Year
+            },
+            new Hours
+            {
+                User = 1,
+                Date = new DateTime(2022, 04, 15),
+                DayNumber = (short)new DateTime(2022, 04, 15).DayOfYear,
+                Id = 4,
+                Locked = false,
+                TaskId = 1,
+                Value = 7.5m,
+                Year = (short)new DateTime(2022, 04, 15).Year
+            },
+            new Hours
+            {
+                User = 1,
+                Date = new DateTime(2022, 12, 16),
+                DayNumber = (short)new DateTime(2022, 12, 16).DayOfYear,
+                Id = 5,
+                Locked = false,
+                TaskId = 1,
+                Value = 7.5m,
+                Year = (short)new DateTime(2022, 12, 16).Year
+            } 
+        };
 
-        var service = new InvoiceRateService(mockRepository.Object, _redDaysService, _options, _userContextMock.Object);
+        var service = CreateInvoiceRateService(hours);
 
         decimal invoiceRate = await service.GetEmployeeInvoiceRateForPeriod(new DateTime(2022, 12, 12), new DateTime(2022, 12, 18));
 
@@ -161,92 +222,182 @@ public class InvoiceRateServiceTest
     }
 
     [Fact]
-    public async Task GetEmployeeInvoiceStatisticsByMonth()
+    public async System.Threading.Tasks.Task GetEmployeeInvoiceStatisticsByDaysForJanuary_Expect21Items()
     {
-        var startDate = new DateTime(2022, 01, 01);
+        var startDate = new DateTime(2022, 1, 1);
+        var endDate = new DateTime(2022, 1, 31);
 
-        var timeEntries = new List<TimeEntryWithCustomerDto>();
+        var hours = new List<Hours>();
 
         for (int i = 0; i < 59; i++)
         {
             var newDate = startDate.AddDays(i);
-
             if (newDate.DayOfWeek == DayOfWeek.Sunday || newDate.DayOfWeek == DayOfWeek.Saturday)
             {
                 continue;
             }
 
-
-            timeEntries.Add(new TimeEntryWithCustomerDto
+            hours.Add(new Hours
             {
-                TaskId = 2,
-                CustomerName = "evil inc",
+                User = 1,
+                Date = newDate,
+                DayNumber = (short)newDate.DayOfYear,
+                Id = i + 1,
+                Locked = false,
+                TaskId = 1,
                 Value = 7.5m,
-                Date = newDate
-
+                Year = (short)newDate.Year
             });
         }
 
-        var mockRepository = CreateMockRepository(timeEntries);
-        var service = new InvoiceRateService(mockRepository.Object, _redDaysService, _options, _userContextMock.Object);
+        var service = CreateInvoiceRateService(hours);
 
-        var statistics = await service.GetEmployeeInvoiceStatisticsByMonth(new DateTime(2022, 01, 01), new DateTime(2022, 02, 28));
+        var statistics = await service.GetEmployeeInvoiceStatisticsByPeriod(startDate, endDate, InvoicePeriods.Daily, ExtendPeriod.None);
 
-        Assert.Equal(2, statistics.BillableHours.Count());
+        Assert.Equal(21, statistics.Count());
 
-        Assert.Equal(21 * 7.5m, statistics.BillableHours[0]);
-        Assert.Equal(20 * 7.5m, statistics.BillableHours[1]);
+        Assert.Equal(7.5m, statistics.First().BillableHours);
+        Assert.Equal(0m, statistics.First().VacationHours);
+        Assert.Equal(0m, statistics.First().NonBillableHours);
+        Assert.Equal(1m, statistics.First().InvoiceRate);
+        Assert.Equal(0m, statistics.First().NonBillableInvoiceRate);
+        Assert.Equal(new DateTime(2022, 1, 3), statistics.First().Start);
+        Assert.Equal(new DateTime(2022, 1, 3).Date, statistics.First().End.Date);
 
-        Assert.Equal(0m, statistics.VacationHours[0]);
-        Assert.Equal(0m, statistics.VacationHours[1]);
-
-        Assert.Equal(1m, statistics.InvoiceRate[0]);
-        Assert.Equal(1m, statistics.InvoiceRate[1]);
+        Assert.Equal(7.5m, statistics.Last().BillableHours);
+        Assert.Equal(0m, statistics.Last().VacationHours);
+        Assert.Equal(0m, statistics.Last().NonBillableHours);
+        Assert.Equal(1m, statistics.Last().InvoiceRate);
+        Assert.Equal(0m, statistics.Last().NonBillableInvoiceRate);
+        Assert.Equal(endDate, statistics.Last().Start.Date);
+        Assert.Equal(endDate.Date, statistics.Last().End.Date);
     }
 
-    [Fact]
-    public async Task GetEmployeeInvoiceStatisticsByMonth_When_Spanning_Years()
+    private InvoiceRateService CreateInvoiceRateService(List<Hours> hours)
     {
+        var context = new AlvTimeDbContextBuilder()
+            .CreateDbContext();
+        PopulateContext(context, hours);
+        ITimeRegistrationStorage storage = new TimeRegistrationStorage(context);
+        return new InvoiceRateService(storage, _redDaysService, _options, _userContextMock.Object);
+    }
 
-        var startDate = new DateTime(2021, 01, 01);
+    private void PopulateContext(AlvTime_dbContext context, List<Hours> hours)
+    {
+        foreach (var hour in hours)
+            context.Hours.Add(hour);
 
-        var timeEntries = new List<TimeEntryWithCustomerDto>();
-
-        for (int i = 0; i < 395; i++)
+        context.HourRate.Add(new HourRate
         {
-            var newDate = startDate.AddDays(i);
+            Id = 1,
+            FromDate = new DateTime(2019, 01, 01),
+            Rate = 1000,
+            TaskId = 1
+        });
 
-            if (newDate.DayOfWeek == DayOfWeek.Sunday || newDate.DayOfWeek == DayOfWeek.Saturday)
-            {
-                continue;
-            }
+        context.Customer.Add(new Customer
+        {
+            Id = 1,
+            Name = "Alv"
+        });
+        context.Customer.Add(new Customer
+        {
+            Id = 2,
+            Name = "Evil inc"
+        });
 
+        context.Project.Add(new Project
+        {
+            Id = 1,
+            Name = "Internal",
+            Customer = 1
+        });
+        context.Project.Add(new Project
+        {
+            Id = 2,
+            Name = "Money Maker",
+            Customer = 2
+        });
+        context.Project.Add(new Project
+        {
+            Id = 9,
+            Name = "Absence Project",
+            Customer = 1
+        });
 
-            timeEntries.Add(new TimeEntryWithCustomerDto
-            {
-                TaskId = 2,
-                CustomerName = "evil inc",
-                Value = 7.5m,
-                Date = newDate
+        context.Task.Add(new AlvTime.Persistence.DatabaseModels.Task
+        {
+            Id = 1,
+            Description = "",
+            Project = 2,
+            Name = "Print Money"
+        });
 
-            });
-        }
+        context.Task.Add(new AlvTime.Persistence.DatabaseModels.Task
+        {
+            Id = 2,
+            Description = "",
+            Project = 1,
+            Name = "Slave Labor"
+        });
 
+        context.Task.Add(new AlvTime.Persistence.DatabaseModels.Task
+        {
+            Id = 3,
+            Description = "",
+            Project = 1,
+            Name = "Make Lunch"
+        });
 
-        var mockRepository = CreateMockRepository(timeEntries);
-        var service = new InvoiceRateService(mockRepository.Object, _redDaysService, _options, _userContextMock.Object);
+        context.CompensationRate.Add(new CompensationRate
+        {
+            TaskId = 1,
+            Value = 1.5M,
+            FromDate = new DateTime(2019, 01, 01)
+        });
+        context.CompensationRate.Add(new CompensationRate
+        {
+            TaskId = 2,
+            Value = 1.0M,
+            FromDate = new DateTime(2019, 01, 01)
+        });
+        context.CompensationRate.Add(new CompensationRate
+        {
+            TaskId = 3,
+            Value = 0.5M,
+            FromDate = new DateTime(2019, 01, 01)
+        });
 
-        var statistics = await service.GetEmployeeInvoiceStatisticsByMonth(new DateTime(2021, 01, 01), new DateTime(2022, 01, 31));
+        context.Task.Add(new AlvTime.Persistence.DatabaseModels.Task
+        {
+            Id = 10,
+            Description = "",
+            Project = 9,
+            Name = "PaidHoliday",
+            Locked = false
+        });
+        context.Task.Add(new AlvTime.Persistence.DatabaseModels.Task
+        {
+            Id = 11,
+            Description = "",
+            Project = 9,
+            Name = "SickDay",
+            Locked = false
+        });
 
-        Assert.Equal(13, statistics.BillableHours.Count());
+        context.CompensationRate.Add(new CompensationRate
+        {
+            TaskId = 10,
+            Value = 1.0M,
+            FromDate = new DateTime(2019, 01, 01)
+        });
+        context.CompensationRate.Add(new CompensationRate
+        {
+            TaskId = 11,
+            Value = 1.0M,
+            FromDate = new DateTime(2019, 01, 01)
+        });
 
-    }
-
-    private Mock<ITimeRegistrationStorage> CreateMockRepository(List<TimeEntryWithCustomerDto> result)
-    {
-        var userInvoiceMock = new Mock<ITimeRegistrationStorage>();
-        userInvoiceMock.Setup(context => context.GetTimeEntriesWithCustomer(It.IsAny<int>(), It.IsAny<DateTime>(), It.IsAny<DateTime>())).Returns(Task.FromResult(result));
-
-        return userInvoiceMock;
+        context.SaveChanges();
     }
 }
