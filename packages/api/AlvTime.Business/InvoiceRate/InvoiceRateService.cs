@@ -1,10 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Globalization;
-using System.Linq;
-using System.Net.Http.Headers;
-using System.Security.Cryptography.X509Certificates;
-using System.Threading.Tasks;
 using AlvTime.Business.Holidays;
 using AlvTime.Business.Interfaces;
 using AlvTime.Business.Models;
@@ -13,6 +6,10 @@ using AlvTime.Business.TimeEntries;
 using AlvTime.Business.TimeRegistration;
 using AlvTime.Business.Utils;
 using Microsoft.Extensions.Options;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 using static AlvTime.Business.InvoiceRate.InvoiceStatisticsDto;
 
 namespace AlvTime.Business.InvoiceRate;
@@ -91,9 +88,9 @@ public class InvoiceRateService
         return invoicePeriod switch
         {
             InvoicePeriods.Daily => userTasks.GroupBy(x => (x.Date.Date, new DateTime(x.Date.Year, x.Date.Month, x.Date.Day, 23, 59, 59))),
-            InvoicePeriods.Weekly => userTasks.GroupBy(x => (x.Date.AddDays(-(int)x.Date.DayOfWeek + 1).Date, x.Date.AddDays(-(int)x.Date.DayOfWeek + 1).Date)),
+            InvoicePeriods.Weekly => userTasks.GroupBy(x => (GetStartOfWeek(x.Date).Date, GetEndOfWeek(x.Date))),
             InvoicePeriods.Monthly => userTasks.GroupBy(x => (new DateTime(x.Date.Year, x.Date.Month, 1), new DateTime(x.Date.Year, x.Date.Month, DateTime.DaysInMonth(x.Date.Year, x.Date.Month), 23, 59, 59))),
-            InvoicePeriods.Annualy => userTasks.GroupBy(x => (new DateTime(x.Date.Year, 1, 1), new DateTime(x.Date.Year, 1, 1))),
+            InvoicePeriods.Annualy => userTasks.GroupBy(x => (new DateTime(x.Date.Year, 1, 1), new DateTime(x.Date.Year, 12, 31, 23, 59, 59))),
             _ => throw new NotImplementedException()
         };
     }
@@ -106,12 +103,13 @@ public class InvoiceRateService
         return invoicePeriod switch
         {
             InvoicePeriods.Daily => new DateTime(fromDate.Year, fromDate.Month, fromDate.Day),
-            InvoicePeriods.Weekly => fromDate.AddDays(-(int)fromDate.DayOfWeek + 1).Date,
+            InvoicePeriods.Weekly => GetStartOfWeek(fromDate).Date,
             InvoicePeriods.Monthly => new DateTime(fromDate.Year, fromDate.Month, 1),
             InvoicePeriods.Annualy => new DateTime(fromDate.Year, 1, 1),
             _ => throw new NotImplementedException()
         };
     }
+
 
     private DateTime GetInvoicePeriodEnd(DateTime toDate, InvoicePeriods invoicePeriod, ExtendPeriod extendperiod)
     {
@@ -121,11 +119,21 @@ public class InvoiceRateService
         return invoicePeriod switch
         {
             InvoicePeriods.Daily => new DateTime(toDate.Year, toDate.Month, toDate.Day, 23, 59, 59),
-            InvoicePeriods.Weekly => toDate.AddDays(-(int)toDate.DayOfWeek + 1).Date,
+            InvoicePeriods.Weekly => GetEndOfWeek(toDate),
             InvoicePeriods.Monthly => new DateTime(toDate.Year, toDate.Month, DateTime.DaysInMonth(toDate.Year, toDate.Month), 23, 59, 59),
             InvoicePeriods.Annualy => new DateTime(toDate.Year, 12, 31, 23, 59, 59),
             _ => throw new NotImplementedException()
         };
+    }
+
+    private static DateTime GetStartOfWeek(DateTime date)
+    {
+        return date.DayOfWeek == DayOfWeek.Sunday ? date.AddDays(-6) : date.AddDays(1 - (int)date.DayOfWeek).Date;
+    }
+
+    private static DateTime GetEndOfWeek(DateTime date)
+    {
+        return date.DayOfWeek == DayOfWeek.Sunday ? date.AddSeconds(86399) : date.Date.AddDays(7 - (int)date.DayOfWeek).Date.AddSeconds(86399);
     }
 
     private decimal GetInvoiceRateForPeriod(decimal billableHours, decimal vacationHours, DateTime fromDate, DateTime toDate)
@@ -134,47 +142,19 @@ public class InvoiceRateService
         return billableHours / (availableHours > 0 ? availableHours : 1);
     }
 
-    private decimal[] GetMonthlyDataset(IEnumerable<TimeEntryWithCustomerDto> entries, DateTime fromDate, DateTime toDate)
-    {
-        var months = ((toDate.Year - fromDate.Year) * 12) + toDate.Month - fromDate.Month + 1;
-        var result = new decimal[months];
-
-        if (entries == null)
-        {
-            return result;
-        }
-
-        for (int i = 0; i < months; i++)
-        {
-            var period = fromDate.AddMonths(i);
-            result[i] = entries.Where(entry => entry.Date.Month == period.Month && entry.Date.Year == period.Year).Sum(entry => entry.Value);
-        }
-
-        return result;
-    }
-
-
     private TaskType GetTaskType(TimeEntryWithCustomerDto entry)
     {
         if (entry.TaskId == _timeEntryOptions.PaidHolidayTask || entry.TaskId == _timeEntryOptions.UnpaidHolidayTask)
-        {
             return TaskType.VACATION;
-        }
-
         if (entry.CustomerName.ToLower() == "alv")
-        {
             return TaskType.NON_BILLABLE;
-        }
-
         return TaskType.BILLABLE;
     }
 
     private decimal GetUserAvailableHours(DateTime fromDate, DateTime toDate)
     {
         decimal redDayHours = GetNonWorkingDays(fromDate, toDate).Count() * 7.5m;
-
         var workingHours = 7.5m + (toDate - fromDate).Days * 7.5m;
-
         return workingHours - redDayHours;
     }
 
@@ -184,19 +164,14 @@ public class InvoiceRateService
         var redDays = _redDaysService.GetRedDaysFromYears(fromDate.Year, toDate.Year)
             .Select(dateString => DateTime.Parse(dateString))
             .Where(date => date >= fromDate && date <= toDate);
-
         var weekendDays = DateUtils.GetWeekendDays(fromDate, toDate).Where(day => !redDays.Any(redDay => redDay == day));
-
         return weekendDays.Concat(redDays);
     }
 
     private DateTime GetUserStartDateOrFromDate(DateTime fromDate, User user)
     {
         if (fromDate < user.StartDate)
-        {
             return user.StartDate;
-        }
-
         return fromDate;
     }
 }

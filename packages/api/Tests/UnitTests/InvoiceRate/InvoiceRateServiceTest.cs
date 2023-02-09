@@ -1,26 +1,22 @@
-using System;
-using Xunit;
-using AlvTime.Business.Options;
-using Moq;
-using Microsoft.Extensions.Options;
 using AlvTime.Business.Holidays;
-using AlvTime.Business.InvoiceRate;
-using System.Collections.Generic;
-using AlvTime.Business.TimeEntries;
-using AlvTime.Business.TimeRegistration;
 using AlvTime.Business.Interfaces;
-using System.Linq;
-using static AlvTime.Business.InvoiceRate.InvoiceStatisticsDto;
-using AlvTime.Persistence.Repositories;
+using AlvTime.Business.InvoiceRate;
+using AlvTime.Business.Options;
+using AlvTime.Business.TimeRegistration;
 using AlvTime.Persistence.DatabaseModels;
+using AlvTime.Persistence.Repositories;
+using Microsoft.Extensions.Options;
+using Moq;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Xunit;
+using static AlvTime.Business.InvoiceRate.InvoiceStatisticsDto;
 
 namespace Tests.UnitTests.InvoiceRate;
 
-
-
 public class InvoiceRateServiceTest
 {
-
     private readonly IOptionsMonitor<TimeEntryOptions> _options;
     private readonly IRedDaysService _redDaysService;
     private readonly Mock<IUserContext> _userContextMock;
@@ -193,13 +189,13 @@ public class InvoiceRateServiceTest
             new Hours
             {
                 User = 1,
-                Date = new DateTime(2022, 04, 15),
-                DayNumber = (short)new DateTime(2022, 04, 15).DayOfYear,
+                Date = new DateTime(2022, 12, 15),
+                DayNumber = (short)new DateTime(2022, 12, 15).DayOfYear,
                 Id = 4,
                 Locked = false,
                 TaskId = 1,
                 Value = 7.5m,
-                Year = (short)new DateTime(2022, 04, 15).Year
+                Year = (short)new DateTime(2022, 12, 15).Year
             },
             new Hours
             {
@@ -273,6 +269,158 @@ public class InvoiceRateServiceTest
         Assert.Equal(endDate.Date, statistics.Last().End.Date);
     }
 
+    [Fact]
+    public async System.Threading.Tasks.Task GetEmployeeInvoiceStatisticsForOneWeek_Expect1ItemAndCorrectHours()
+    {
+        var startDate = new DateTime(2022, 1, 3);
+        var endDate = new DateTime(2022, 1, 9);
+
+        var hours = new List<Hours>();
+        for (int i = 0; i < 7; i++)
+        {
+            var newDate = startDate.AddDays(i);
+            hours.Add(new Hours
+            {
+                User = 1,
+                Date = newDate,
+                DayNumber = (short)newDate.DayOfYear,
+                Id = i + 1,
+                Locked = false,
+                TaskId = 1,
+                Value = 7.5m,
+                Year = (short)newDate.Year
+            });
+        }
+
+        var service = CreateInvoiceRateService(hours);
+
+        var statistics = await service.GetEmployeeInvoiceStatisticsByPeriod(startDate, endDate, InvoicePeriods.Weekly, ExtendPeriod.None);
+
+        Assert.Equal(1, statistics.Count());
+
+        Assert.Equal(7.5m * 7, statistics.First().BillableHours);
+        Assert.Equal(0m, statistics.First().VacationHours);
+        Assert.Equal(0m, statistics.First().NonBillableHours);
+        Assert.Equal(1.4m, statistics.First().InvoiceRate);
+        Assert.Equal(0m, statistics.First().NonBillableInvoiceRate);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task GetEmployeeInvoiceStatisticsForTwoWeeks_Expect2ItemsAndCorrectHours()
+    {
+        var startDate = new DateTime(2022, 1, 3);
+        var endDate = new DateTime(2022, 1, 16);
+
+        var hours = new List<Hours>();
+        for (int i = 0; i < 14; i++)
+        {
+            var newDate = startDate.AddDays(i);
+            if (newDate.DayOfWeek == DayOfWeek.Sunday || newDate.DayOfWeek == DayOfWeek.Saturday)
+            {
+                continue;
+            }
+            hours.Add(new Hours
+            {
+                User = 1,
+                Date = newDate,
+                DayNumber = (short)newDate.DayOfYear,
+                Id = i + 1,
+                Locked = false,
+                TaskId = 1,
+                Value = 7.5m,
+                Year = (short)newDate.Year
+            });
+        }
+
+        var service = CreateInvoiceRateService(hours);
+
+        var statistics = await service.GetEmployeeInvoiceStatisticsByPeriod(startDate, endDate, InvoicePeriods.Weekly, ExtendPeriod.None);
+
+        Assert.Equal(2, statistics.Count());
+
+        Assert.Equal(7.5m * 5, statistics.First().BillableHours);
+        Assert.Equal(0m, statistics.First().VacationHours);
+        Assert.Equal(0m, statistics.First().NonBillableHours);
+        Assert.Equal(1m, statistics.First().InvoiceRate);
+        Assert.Equal(0m, statistics.First().NonBillableInvoiceRate);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task GetEmployeeInvoiceStatisticsFor12Months_Expect12Periods()
+    {
+        var startDate = new DateTime(2022, 1, 1);
+        var endDate = new DateTime(2022, 12, 31);
+
+        var hours = new List<Hours>();
+        for (int i = 0; i < 365; i++)
+        {
+            var newDate = startDate.AddDays(i);
+            if (newDate.DayOfWeek == DayOfWeek.Sunday || newDate.DayOfWeek == DayOfWeek.Saturday)
+            {
+                continue;
+            }
+            hours.Add(new Hours
+            {
+                User = 1,
+                Date = newDate,
+                DayNumber = (short)newDate.DayOfYear,
+                Id = i + 1,
+                Locked = false,
+                TaskId = 1,
+                Value = 7.5m,
+                Year = (short)newDate.Year
+            });
+        }
+
+        var service = CreateInvoiceRateService(hours);
+
+        var statistics = await service.GetEmployeeInvoiceStatisticsByPeriod(startDate, endDate, InvoicePeriods.Monthly, ExtendPeriod.None);
+
+        Assert.Equal(12, statistics.Count());
+
+        Assert.Equal(1m, statistics.First().InvoiceRate);
+        Assert.Equal(startDate, statistics.First().Start);
+        Assert.Equal(new DateTime(2022, 1, 31), statistics.First().End.Date);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task GetEmployeeInvoiceStatisticsFor2Years_Expect12Periods()
+    {
+        var startDate = new DateTime(2022, 1, 1);
+        var endDate = new DateTime(2023, 12, 31);
+
+        var hours = new List<Hours>();
+        for (int i = 0; i < 730; i++)
+        {
+            var newDate = startDate.AddDays(i);
+            if (newDate.DayOfWeek == DayOfWeek.Sunday || newDate.DayOfWeek == DayOfWeek.Saturday)
+            {
+                continue;
+            }
+            hours.Add(new Hours
+            {
+                User = 1,
+                Date = newDate,
+                DayNumber = (short)newDate.DayOfYear,
+                Id = i + 1,
+                Locked = false,
+                TaskId = 1,
+                Value = 7.5m,
+                Year = (short)newDate.Year
+            });
+        }
+
+        var service = CreateInvoiceRateService(hours);
+
+        var statistics = await service.GetEmployeeInvoiceStatisticsByPeriod(startDate, endDate, InvoicePeriods.Annualy, ExtendPeriod.None);
+
+        Assert.Equal(2, statistics.Count());
+
+        Assert.True(1m < statistics.First().InvoiceRate);
+        Assert.Equal(startDate, statistics.First().Start);
+        Assert.Equal(new DateTime(2022, 12, 31), statistics.First().End.Date);
+    }
+
     private InvoiceRateService CreateInvoiceRateService(List<Hours> hours)
     {
         var context = new AlvTimeDbContextBuilder()
@@ -325,7 +473,7 @@ public class InvoiceRateServiceTest
             Customer = 1
         });
 
-        context.Task.Add(new AlvTime.Persistence.DatabaseModels.Task
+        context.Task.Add(new Task
         {
             Id = 1,
             Description = "",
@@ -333,7 +481,7 @@ public class InvoiceRateServiceTest
             Name = "Print Money"
         });
 
-        context.Task.Add(new AlvTime.Persistence.DatabaseModels.Task
+        context.Task.Add(new Task
         {
             Id = 2,
             Description = "",
@@ -341,7 +489,7 @@ public class InvoiceRateServiceTest
             Name = "Slave Labor"
         });
 
-        context.Task.Add(new AlvTime.Persistence.DatabaseModels.Task
+        context.Task.Add(new Task
         {
             Id = 3,
             Description = "",
@@ -368,7 +516,7 @@ public class InvoiceRateServiceTest
             FromDate = new DateTime(2019, 01, 01)
         });
 
-        context.Task.Add(new AlvTime.Persistence.DatabaseModels.Task
+        context.Task.Add(new Task
         {
             Id = 10,
             Description = "",
@@ -376,7 +524,7 @@ public class InvoiceRateServiceTest
             Name = "PaidHoliday",
             Locked = false
         });
-        context.Task.Add(new AlvTime.Persistence.DatabaseModels.Task
+        context.Task.Add(new Task
         {
             Id = 11,
             Description = "",
