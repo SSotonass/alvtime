@@ -218,7 +218,7 @@ public class InvoiceRateServiceTest
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task GetEmployeeInvoiceStatisticsByDaysForJanuary_Expect21Items()
+    public async System.Threading.Tasks.Task GetEmployeeInvoiceStatisticsByDaysForJanuaryWithoutIncludeZero_Expect21Items()
     {
         var startDate = new DateTime(2022, 1, 1);
         var endDate = new DateTime(2022, 1, 31);
@@ -248,25 +248,89 @@ public class InvoiceRateServiceTest
 
         var service = CreateInvoiceRateService(hours);
 
-        var statistics = await service.GetEmployeeInvoiceStatisticsByPeriod(startDate, endDate, InvoicePeriods.Daily, ExtendPeriod.None);
+        var statistics = await service.GetEmployeeInvoiceStatisticsByPeriod(startDate, endDate, InvoicePeriods.Daily, ExtendPeriod.None, false);
 
-        Assert.Equal(21, statistics.Count());
+        Assert.Equal(21, statistics.BillableHours.Count());
+        Assert.Equal(21, statistics.NonBillableHours.Count());
+        Assert.Equal(21, statistics.VacationHours.Count());
+        Assert.Equal(21, statistics.InvoiceRate.Count());
+        Assert.Equal(21, statistics.NonBillableInvoiceRate.Count());
+        Assert.Equal(21, statistics.Start.Count());
+        Assert.Equal(21, statistics.End.Count());
 
-        Assert.Equal(7.5m, statistics.First().BillableHours);
-        Assert.Equal(0m, statistics.First().VacationHours);
-        Assert.Equal(0m, statistics.First().NonBillableHours);
-        Assert.Equal(1m, statistics.First().InvoiceRate);
-        Assert.Equal(0m, statistics.First().NonBillableInvoiceRate);
-        Assert.Equal(new DateTime(2022, 1, 3), statistics.First().Start);
-        Assert.Equal(new DateTime(2022, 1, 3).Date, statistics.First().End.Date);
+        Assert.Equal(7.5m, statistics.BillableHours[0]);
+        Assert.Equal(0m, statistics.VacationHours[0]);
+        Assert.Equal(0m, statistics.NonBillableHours[0]);
+        Assert.Equal(1m, statistics.InvoiceRate[0]);
+        Assert.Equal(0m, statistics.NonBillableInvoiceRate[0]);
+        Assert.Equal(new DateTime(2022, 1, 3), statistics.Start[0]);
+        Assert.Equal(new DateTime(2022, 1, 3).Date, statistics.End[0].Date);
 
-        Assert.Equal(7.5m, statistics.Last().BillableHours);
-        Assert.Equal(0m, statistics.Last().VacationHours);
-        Assert.Equal(0m, statistics.Last().NonBillableHours);
-        Assert.Equal(1m, statistics.Last().InvoiceRate);
-        Assert.Equal(0m, statistics.Last().NonBillableInvoiceRate);
-        Assert.Equal(endDate, statistics.Last().Start.Date);
-        Assert.Equal(endDate.Date, statistics.Last().End.Date);
+        Assert.Equal(7.5m, statistics.BillableHours.Last());
+        Assert.Equal(0m, statistics.VacationHours.Last());
+        Assert.Equal(0m, statistics.NonBillableHours.Last());
+        Assert.Equal(1m, statistics.InvoiceRate.Last());
+        Assert.Equal(0m, statistics.NonBillableInvoiceRate.Last());
+        Assert.Equal(endDate, statistics.Start.Last().Date);
+        Assert.Equal(endDate.Date, statistics.End.Last().Date);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task GetEmployeeInvoiceStatisticsByDaysForJanuaryWithIncludeZero_Expect31Items()
+    {
+        var startDate = new DateTime(2022, 1, 1);
+        var endDate = new DateTime(2022, 1, 31);
+
+        var hours = new List<Hours>();
+
+        for (int i = 0; i < 59; i++)
+        {
+            var newDate = startDate.AddDays(i);
+            if (newDate.DayOfWeek == DayOfWeek.Sunday || newDate.DayOfWeek == DayOfWeek.Saturday)
+            {
+                continue;
+            }
+
+            hours.Add(new Hours
+            {
+                User = 1,
+                Date = newDate,
+                DayNumber = (short)newDate.DayOfYear,
+                Id = i + 1,
+                Locked = false,
+                TaskId = 1,
+                Value = 7.5m,
+                Year = (short)newDate.Year
+            });
+        }
+
+        var service = CreateInvoiceRateService(hours);
+
+        var statistics = await service.GetEmployeeInvoiceStatisticsByPeriod(startDate, endDate, InvoicePeriods.Daily, ExtendPeriod.None, true);
+
+        Assert.Equal(31, statistics.BillableHours.Count());
+        Assert.Equal(31, statistics.NonBillableHours.Count());
+        Assert.Equal(31, statistics.VacationHours.Count());
+        Assert.Equal(31, statistics.InvoiceRate.Count());
+        Assert.Equal(31, statistics.NonBillableInvoiceRate.Count());
+        Assert.Equal(31, statistics.Start.Count());
+        Assert.Equal(31, statistics.End.Count());
+
+        Assert.Equal(7.5m, statistics.BillableHours[2]);
+        Assert.Equal(0m, statistics.VacationHours[2]);
+        Assert.Equal(0m, statistics.NonBillableHours[2]);
+        Assert.Equal(1m, statistics.InvoiceRate[2]);
+        Assert.Equal(0m, statistics.NonBillableInvoiceRate[2]);
+        Assert.Equal(new DateTime(2022, 1, 3), statistics.Start[2]);
+        Assert.Equal(new DateTime(2022, 1, 3).Date, statistics.End[2].Date);
+
+        Assert.Equal(7.5m, statistics.BillableHours.Last());
+        Assert.Equal(0m, statistics.VacationHours.Last());
+        Assert.Equal(0m, statistics.NonBillableHours.Last());
+        Assert.Equal(1m, statistics.InvoiceRate.Last());
+        Assert.Equal(0m, statistics.NonBillableInvoiceRate.Last());
+        Assert.Equal(endDate, statistics.Start.Last().Date);
+        Assert.Equal(endDate.Date, statistics.End.Last().Date);
     }
 
     [Fact]
@@ -294,15 +358,21 @@ public class InvoiceRateServiceTest
 
         var service = CreateInvoiceRateService(hours);
 
-        var statistics = await service.GetEmployeeInvoiceStatisticsByPeriod(startDate, endDate, InvoicePeriods.Weekly, ExtendPeriod.None);
+        var statistics = await service.GetEmployeeInvoiceStatisticsByPeriod(startDate, endDate, InvoicePeriods.Weekly, ExtendPeriod.None, false);
 
-        Assert.Equal(1, statistics.Count());
+        Assert.Single(statistics.BillableHours);
+        Assert.Single(statistics.NonBillableHours);
+        Assert.Single(statistics.VacationHours);
+        Assert.Single(statistics.InvoiceRate);
+        Assert.Single(statistics.NonBillableInvoiceRate);
+        Assert.Single(statistics.Start);
+        Assert.Single(statistics.End);
 
-        Assert.Equal(7.5m * 7, statistics.First().BillableHours);
-        Assert.Equal(0m, statistics.First().VacationHours);
-        Assert.Equal(0m, statistics.First().NonBillableHours);
-        Assert.Equal(1.4m, statistics.First().InvoiceRate);
-        Assert.Equal(0m, statistics.First().NonBillableInvoiceRate);
+        Assert.Equal(7.5m * 7, statistics.BillableHours[0]);
+        Assert.Equal(0m, statistics.VacationHours[0]);
+        Assert.Equal(0m, statistics.NonBillableHours[0]);
+        Assert.Equal(1.4m, statistics.InvoiceRate[0]);
+        Assert.Equal(0m, statistics.NonBillableInvoiceRate[0]);
     }
 
     [Fact]
@@ -334,15 +404,21 @@ public class InvoiceRateServiceTest
 
         var service = CreateInvoiceRateService(hours);
 
-        var statistics = await service.GetEmployeeInvoiceStatisticsByPeriod(startDate, endDate, InvoicePeriods.Weekly, ExtendPeriod.None);
+        var statistics = await service.GetEmployeeInvoiceStatisticsByPeriod(startDate, endDate, InvoicePeriods.Weekly, ExtendPeriod.None, false);
 
-        Assert.Equal(2, statistics.Count());
+        Assert.Equal(2, statistics.BillableHours.Count());
+        Assert.Equal(2, statistics.NonBillableHours.Count());
+        Assert.Equal(2, statistics.VacationHours.Count());
+        Assert.Equal(2, statistics.InvoiceRate.Count());
+        Assert.Equal(2, statistics.NonBillableInvoiceRate.Count());
+        Assert.Equal(2, statistics.Start.Count());
+        Assert.Equal(2, statistics.End.Count());
 
-        Assert.Equal(7.5m * 5, statistics.First().BillableHours);
-        Assert.Equal(0m, statistics.First().VacationHours);
-        Assert.Equal(0m, statistics.First().NonBillableHours);
-        Assert.Equal(1m, statistics.First().InvoiceRate);
-        Assert.Equal(0m, statistics.First().NonBillableInvoiceRate);
+        Assert.Equal(7.5m * 5, statistics.BillableHours[0]);
+        Assert.Equal(0m, statistics.VacationHours[0]);
+        Assert.Equal(0m, statistics.NonBillableHours[0]);
+        Assert.Equal(1m, statistics.InvoiceRate[0]);
+        Assert.Equal(0m, statistics.NonBillableInvoiceRate[0]);
     }
 
     [Fact]
@@ -374,13 +450,63 @@ public class InvoiceRateServiceTest
 
         var service = CreateInvoiceRateService(hours);
 
-        var statistics = await service.GetEmployeeInvoiceStatisticsByPeriod(startDate, endDate, InvoicePeriods.Monthly, ExtendPeriod.None);
+        var statistics = await service.GetEmployeeInvoiceStatisticsByPeriod(startDate, endDate, InvoicePeriods.Monthly, ExtendPeriod.None, false);
 
-        Assert.Equal(12, statistics.Count());
+        Assert.Equal(12, statistics.BillableHours.Count());
+        Assert.Equal(12, statistics.NonBillableHours.Count());
+        Assert.Equal(12, statistics.VacationHours.Count());
+        Assert.Equal(12, statistics.InvoiceRate.Count());
+        Assert.Equal(12, statistics.NonBillableInvoiceRate.Count());
+        Assert.Equal(12, statistics.Start.Count());
+        Assert.Equal(12, statistics.End.Count());
 
-        Assert.Equal(1m, statistics.First().InvoiceRate);
-        Assert.Equal(startDate, statistics.First().Start);
-        Assert.Equal(new DateTime(2022, 1, 31), statistics.First().End.Date);
+        Assert.Equal(1m, statistics.InvoiceRate[0]);
+        Assert.Equal(startDate, statistics.Start[0]);
+        Assert.Equal(new DateTime(2022, 1, 31), statistics.End[0].Date);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task GetEmployeeInvoiceStatisticsFor2MonthsFromMidToMidOfMonth_Expect2Periods()
+    {
+        var startDate = new DateTime(2022, 1, 15);
+        var endDate = new DateTime(2022, 2, 15);
+
+        var hours = new List<Hours>();
+        for (int i = 0; i < 31; i++)
+        {
+            var newDate = startDate.AddDays(i);
+            if (newDate.DayOfWeek == DayOfWeek.Sunday || newDate.DayOfWeek == DayOfWeek.Saturday)
+            {
+                continue;
+            }
+            hours.Add(new Hours
+            {
+                User = 1,
+                Date = newDate,
+                DayNumber = (short)newDate.DayOfYear,
+                Id = i + 1,
+                Locked = false,
+                TaskId = 1,
+                Value = 7.5m,
+                Year = (short)newDate.Year
+            });
+        }
+
+        var service = CreateInvoiceRateService(hours);
+
+        var statistics = await service.GetEmployeeInvoiceStatisticsByPeriod(startDate, endDate, InvoicePeriods.Monthly, ExtendPeriod.None, true);
+
+        Assert.Equal(2, statistics.BillableHours.Count());
+        Assert.Equal(2, statistics.NonBillableHours.Count());
+        Assert.Equal(2, statistics.VacationHours.Count());
+        Assert.Equal(2, statistics.InvoiceRate.Count());
+        Assert.Equal(2, statistics.NonBillableInvoiceRate.Count());
+        Assert.Equal(2, statistics.Start.Count());
+        Assert.Equal(2, statistics.End.Count());
+
+        Assert.Equal(1m, statistics.InvoiceRate[0]);
+        Assert.Equal(new DateTime(2022, 1, 1), statistics.Start[0]);
+        Assert.Equal(new DateTime(2022, 1, 31), statistics.End[0].Date);
     }
 
     [Fact]
@@ -412,13 +538,19 @@ public class InvoiceRateServiceTest
 
         var service = CreateInvoiceRateService(hours);
 
-        var statistics = await service.GetEmployeeInvoiceStatisticsByPeriod(startDate, endDate, InvoicePeriods.Annualy, ExtendPeriod.None);
+        var statistics = await service.GetEmployeeInvoiceStatisticsByPeriod(startDate, endDate, InvoicePeriods.Annualy, ExtendPeriod.None, false);
 
-        Assert.Equal(2, statistics.Count());
+        Assert.Equal(2, statistics.BillableHours.Count());
+        Assert.Equal(2, statistics.NonBillableHours.Count());
+        Assert.Equal(2, statistics.VacationHours.Count());
+        Assert.Equal(2, statistics.InvoiceRate.Count());
+        Assert.Equal(2, statistics.NonBillableInvoiceRate.Count());
+        Assert.Equal(2, statistics.Start.Count());
+        Assert.Equal(2, statistics.End.Count());
 
-        Assert.True(1m < statistics.First().InvoiceRate);
-        Assert.Equal(startDate, statistics.First().Start);
-        Assert.Equal(new DateTime(2022, 12, 31), statistics.First().End.Date);
+        Assert.True(1m < statistics.InvoiceRate[0]);
+        Assert.Equal(startDate, statistics.Start[0]);
+        Assert.Equal(new DateTime(2022, 12, 31), statistics.End[0].Date);
     }
 
     private InvoiceRateService CreateInvoiceRateService(List<Hours> hours)

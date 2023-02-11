@@ -56,7 +56,7 @@ public class InvoiceRateService
         return billableHours / availableHours;
     }
 
-    public async Task<IEnumerable<InvoiceStatisticsDto>> GetEmployeeInvoiceStatisticsByPeriod(DateTime fromDate, DateTime toDate, InvoicePeriods invoicePeriod, ExtendPeriod extendPeriod)
+    public async Task<InvoiceStatisticsDto> GetEmployeeInvoiceStatisticsByPeriod(DateTime fromDate, DateTime toDate, InvoicePeriods invoicePeriod, ExtendPeriod extendPeriod, bool includeZeroPeriods)
     {
         var user = await _userContext.GetCurrentUser();
         var invoicePeriodStart = GetInvoicePeriodStart(fromDate, invoicePeriod, extendPeriod);
@@ -65,22 +65,62 @@ public class InvoiceRateService
         var userTasks = await _timeRegistrationStorage.GetTimeEntriesWithCustomer(user.Id, invoicePeriodStart, invoicePeriodEnd);
         var taskPeriodGrouping = GroupTasksByInvoicePeriod(userTasks, invoicePeriod);
 
-        return taskPeriodGrouping.Select(grouping =>
+        var billableHours = new List<decimal>();
+        var nonBillableHours = new List<decimal>();
+        var vacationHours = new List<decimal>();
+        var invoiceRates = new List<decimal>();
+        var nonBillableInvoiceRate = new List<decimal>();
+        var starts = new List<DateTime>();
+        var ends = new List<DateTime>();
+
+        var previousPeriodEnd = invoicePeriodStart.AddSeconds(-1);
+        foreach (var grouping in taskPeriodGrouping)
         {
-            var billableHours = grouping.Where(timeEntry => GetTaskType(timeEntry) == TaskType.BILLABLE).Sum(timeEntry => timeEntry.Value);
-            var nonBillableHours = grouping.Where(timeEntry => GetTaskType(timeEntry) == TaskType.NON_BILLABLE).Sum(timeEntry => timeEntry.Value);
-            var vacationHours = grouping.Where(timeEntry => GetTaskType(timeEntry) == TaskType.VACATION).Sum(timeEntry => timeEntry.Value);
-            return new InvoiceStatisticsDto
+            var periodStart = (grouping.Key.periodStart < invoicePeriodStart) ? invoicePeriodStart : grouping.Key.periodStart;
+            var periodEnd = (grouping.Key.periodEnd > invoicePeriodEnd) ? invoicePeriodEnd : grouping.Key.periodEnd;
+
+            while (includeZeroPeriods && (periodStart - previousPeriodEnd).TotalSeconds != 1)
             {
-                Start = grouping.Key.periodStart,
-                End = grouping.Key.periodEnd,
-                BillableHours = billableHours,
-                InvoiceRate = GetInvoiceRateForPeriod(billableHours, vacationHours, grouping.Key.periodStart, grouping.Key.periodEnd),
-                NonBillableHours = nonBillableHours,
-                NonBillableInvoiceRate = GetInvoiceRateForPeriod(nonBillableHours, vacationHours, grouping.Key.periodStart, grouping.Key.periodEnd),
-                VacationHours = vacationHours
-            };
-        });
+                var start = previousPeriodEnd.AddSeconds(1);
+                var end = GetInvoicePeriodEnd(start, invoicePeriod, ExtendPeriod.End);
+
+                billableHours.Add(0);
+                nonBillableHours.Add(0);
+                vacationHours.Add(0);
+                invoiceRates.Add(0);
+                nonBillableInvoiceRate.Add(0);
+                starts.Add(start);
+                ends.Add(end);
+
+                previousPeriodEnd = end;
+            }
+
+            var bh = grouping.Where(timeEntry => GetTaskType(timeEntry) == TaskType.BILLABLE).Sum(timeEntry => timeEntry.Value);
+            var nbh = grouping.Where(timeEntry => GetTaskType(timeEntry) == TaskType.NON_BILLABLE).Sum(timeEntry => timeEntry.Value);
+            var vh = grouping.Where(timeEntry => GetTaskType(timeEntry) == TaskType.VACATION).Sum(timeEntry => timeEntry.Value);
+
+            billableHours.Add(bh);
+            nonBillableHours.Add(nbh);
+            vacationHours.Add(vh);
+            invoiceRates.Add(GetInvoiceRateForPeriod(bh, vh, periodStart, periodEnd));
+            nonBillableInvoiceRate.Add(GetInvoiceRateForPeriod(nbh, vh, periodStart, periodEnd));
+            starts.Add(grouping.Key.periodStart);
+            ends.Add(periodEnd);
+
+            previousPeriodEnd = periodEnd;
+        }
+
+
+        return new InvoiceStatisticsDto
+        {
+            Start = starts.ToArray(),
+            End = ends.ToArray(),
+            BillableHours = billableHours.ToArray(),
+            InvoiceRate = invoiceRates.ToArray(),
+            NonBillableHours = nonBillableHours.ToArray(),
+            NonBillableInvoiceRate = nonBillableInvoiceRate.ToArray(),
+            VacationHours = vacationHours.ToArray()
+        };
     }
 
     private IEnumerable<IGrouping<(DateTime periodStart, DateTime periodEnd), TimeEntryWithCustomerDto>> GroupTasksByInvoicePeriod(List<TimeEntryWithCustomerDto> userTasks, InvoicePeriods invoicePeriod)

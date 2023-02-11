@@ -41,8 +41,8 @@ public class InvoiceRateController : ControllerBase
 
     [HttpGet("InvoiceStatistics")]
     [Authorize(Policy = "AllowPersonalAccessToken")]
-    public async Task<IEnumerable<InvoiceStatisticsDto>> FetchUserInvoiceStatistics(DateTime fromDate, DateTime toDate, InvoicePeriods period, ExtendPeriod extendPeriod)
+    public async Task<InvoiceStatisticsDto> FetchUserInvoiceStatistics(DateTime fromDate, DateTime toDate, InvoicePeriods period, ExtendPeriod extendPeriod, bool includeZeroPeriods)
     {
-        return await _invoiceRateService.GetEmployeeInvoiceStatisticsByPeriod(fromDate.Date, toDate.Date, period, extendPeriod);
+        return await _invoiceRateService.GetEmployeeInvoiceStatisticsByPeriod(fromDate.Date, toDate.Date, period, extendPeriod, includeZeroPeriods);
     }
 }
